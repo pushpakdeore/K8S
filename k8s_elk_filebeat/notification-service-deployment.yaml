@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+      annotations:
+        prometheus.io/scrape: "true"  # Enable scraping
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"# The port to scrape
+    spec:
+      containers:
+        - name: notification-service
+          image: localhost/notification-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_RABBITMQ_HOST
+              value: rabbitmq
+            - name: SPRING_RABBITMQ_PORT
+              value: "5672"
+            - name: LOG_PATH
+              value: /logs/app.log
+          volumeMounts:
+            - name: shared-logs
+              mountPath: /logs
+
+        - name: filebeat
+          image: docker.elastic.co/beats/filebeat:8.12.0
+          args: ["-e", "-c", "/etc/filebeat/filebeat.yml"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/filebeat/filebeat.yml
+              subPath: filebeat.yml
+            - name: shared-logs
+              mountPath: /logs
+
+      volumes:
+        - name: shared-logs
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: filebeat-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+

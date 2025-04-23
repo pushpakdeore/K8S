@@ -1,0 +1,77 @@
+MINIKUBE :
+
+kubectl create deployment my-nginx --image=nginx:latest
+kubectl expose deployment my-nginx --port=80 --type=LoadBalancer
+minikube service my-nginx
+kubectl get services
+kubectl delete deployment my-nginx
+kubectl get deployments
+kubectl get pods
+
+
+podman save --format docker-archive -o user-service.tar user-service:latest
+minikube image load user-service.tar
+
+
+minikube image build -t user-service:latest ./user-service
+
+minikube image build -t notification-service:latest ./notification-service
+
+podman build -t user-service:latest ./user-service
+podman build -t notification-service:latest ./notification-service
+podman save -o user-service.tar localhost/user-service:latest
+podman save -o notification-service.tar localhost/notification-service:latest
+minikube image load user-service.tar
+minikube image load notification-service.tar
+
+
+
+
+minikube ssh
+
+kubectl apply -f C:\Users\pushpak.deore\OneDrive - Apexon\Desktop\minikube\k8sdemo
+ kubectl apply -f "C:\Users\pushpak.deore\OneDrive - Apexon\Desktop\minikube\k8sdemo\notification-service"
+
+
+kubectl delete service user-service
+kubectl delete service notification-service
+kubectl delete deployment user-service
+kubectl delete deployment notification-service
+
+
+kubectl get pods
+
+minikube service nginx
+kubectl logs user-service-5466bd5d56-9skmr
+kubectl get svc
+kubectl apply -f elasticsearch/
+
+
+kubectl port-forward svc/user-service 8080:8080
+
+kubectl apply -f k8sdemo/elasticsearch/
+kubectl apply -f k8sdemo/kibana/
+kubectl apply -f k8sdemo/logstash/
+kubectl apply -f k8sdemo/mysql/
+kubectl apply -f k8sdemo/rabbitmq/
+kubectl apply -f k8sdemo/user-service/
+kubectl apply -f k8sdemo/notification-service/
+kubectl apply -f k8sdemo/nginx/
+
+kubectl delete deployments --all
+kubectl delete service --all
+
+kubectl get pods -n elk
+
+kubectl get daemonset
+
+
+minikube start --cpus=4 --memory=7000
+kubectl apply -f .\k8s_elk_filebeat\
+
+RabbitMQ sepret
+MySQL open
+kubectl port-forward svc/user-service 8080:8080
+minikube service kibana --url
+ kubectl apply -f prometheus-config.yaml
+kubectl rollout restart deployment prometheusgit

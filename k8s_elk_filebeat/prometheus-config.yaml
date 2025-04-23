@@ -1,0 +1,279 @@
+# -----------------------------
+# 1. ServiceAccount & RBAC
+# -----------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - services
+      - endpoints
+      - pods
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: default
+
+# -----------------------------
+# 2. Prometheus ConfigMap
+# -----------------------------
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: default
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: (.+);(.+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+
+# -----------------------------
+# 3. Prometheus Deployment
+# -----------------------------
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: prometheus-config-volume
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+      volumes:
+        - name: prometheus-config-volume
+          configMap:
+            name: prometheus-config
+
+# -----------------------------
+# 4. Prometheus Service
+# -----------------------------
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: default
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+  type: NodePort
+
+
+
+
+#apiVersion: v1
+#kind: ConfigMap
+#metadata:
+#  name: prometheus-config
+#data:
+#  prometheus.yml: |
+#    global:
+#      scrape_interval: 15s
+#      evaluation_interval: 15s
+#
+#    scrape_configs:
+#      - job_name: 'kubernetes-pods'
+#        kubernetes_sd_configs:
+#          - role: pod
+#        relabel_configs:
+#          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+#            action: keep
+#            regex: "true"
+#          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+#            action: replace
+#            target_label: __metrics_path__
+#            regex: (.+)
+#          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
+#            action: replace
+#            regex: (.+);(.+)
+#            replacement: $1:$2
+#            target_label: __address__
+#          - source_labels: [__meta_kubernetes_namespace]
+#            action: replace
+#            target_label: namespace
+#          - source_labels: [__meta_kubernetes_pod_name]
+#            action: replace
+#            target_label: pod
+#          - action: labelmap
+#            regex: __meta_kubernetes_pod_label_(.+)
+#---
+#apiVersion: apps/v1
+#kind: Deployment
+#metadata:
+#  name: prometheus
+#spec:
+#  replicas: 1
+#  selector:
+#    matchLabels:
+#      app: prometheus
+#  template:
+#    metadata:
+#      labels:
+#        app: prometheus
+#    spec:
+#      containers:
+#        - name: prometheus
+#          image: prom/prometheus:latest
+#          ports:
+#            - containerPort: 9090
+#          volumeMounts:
+#            - name: prometheus-config-volume
+#              mountPath: /etc/prometheus/prometheus.yml
+#              subPath: prometheus.yml
+#          args:
+#            - "--config.file=/etc/prometheus/prometheus.yml"
+#      volumes:
+#        - name: prometheus-config-volume
+#          configMap:
+#            name: prometheus-config
+#---
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  name: prometheus
+#spec:
+#  selector:
+#    app: prometheus
+#  ports:
+#    - port: 9090
+#      targetPort: 9090
+#  type: ClusterIP  # For local Minikube access
+
+
+
+#
+#apiVersion: v1
+#kind: ConfigMap
+#metadata:
+#  name: prometheus-config
+#data:
+#  prometheus.yml: |
+#    global:
+#      scrape_interval:     15s
+#      evaluation_interval: 15s
+#
+#    scrape_configs:
+#      - job_name: 'user-service'
+#        metrics_path: '/actuator/prometheus'
+#        scrape_interval: 5s
+#        static_configs:
+#          - targets: ['user-service:8080']
+#
+#      - job_name: 'notification-service'
+#        metrics_path: '/actuator/prometheus'
+#        scrape_interval: 5s
+#        static_configs:
+#          - targets: ['notification-service:8080']
+#---
+#apiVersion: apps/v1
+#kind: Deployment
+#metadata:
+#  name: prometheus
+#spec:
+#  replicas: 1
+#  selector:
+#    matchLabels:
+#      app: prometheus
+#  template:
+#    metadata:
+#      labels:
+#        app: prometheus
+#    spec:
+#      containers:
+#        - name: prometheus
+#          image: prom/prometheus:latest
+#          ports:
+#            - containerPort: 9090
+#          volumeMounts:
+#            - name: prometheus-config-volume
+#              mountPath: /etc/prometheus/prometheus.yml
+#              subPath: prometheus.yml
+#          args:
+#            - "--config.file=/etc/prometheus/prometheus.yml"
+#      volumes:
+#        - name: prometheus-config-volume
+#          configMap:
+#            name: prometheus-config
+#---
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  name: prometheus
+#spec:
+#  selector:
+#    app: prometheus
+#  ports:
+#    - port: 9090
+#      targetPort: 9090
+#  type: ClusterIP # Change to NodePort for local testing only
+
